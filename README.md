@@ -34,6 +34,11 @@ DDL・擬似コード・状態機械・EBNF・フィールド単位契約・受�
 | M4 | [api-contracts](slack-spec/impl/M4-api-contracts.md) | コア API のフィールド単位契約: 全引数・バリデーション順序・全エラーコード・応答スキーマ、レート制限実装、Events API 配信契約 |
 | M5 | [unread-notification-algorithms](slack-spec/impl/M5-unread-notification-algorithms.md) | 未読/メンション数の計算式、通知判定の決定的関数（decide）、配信ルーティング、プッシュペイロード、バッジ定義、DND 判定、受け入れ基準 |
 | M6 | [ui-metrics](slack-spec/impl/M6-ui-metrics.md) | デザイントークン（色/タイポ）、レイアウト寸法、メッセージ行構造、集約規則、ホバーバー、コンポーザ、スクロール挙動、アニメーション、a11y |
+| M7 | [blockkit-complete](slack-spec/impl/M7-blockkit-complete.md) | Block Kit 網羅: surface×block 配置マトリクス、全ブロック/要素/composition object のフィールド・上限値、インタラクションペイロード契約、バリデーション順序、フォールバック描画 |
+| M8 | [search-grammar-ranking](slack-spec/impl/M8-search-grammar-ranking.md) | 検索クエリ EBNF、修飾子の値文法と結合規則（OR/AND/否定）、アナライザ/権限フィルタ、ランキング関数（BM25×鮮度×親和性×反応量）、検索 UI 状態機械 |
+| M9 | [huddles-webrtc](slack-spec/impl/M9-huddles-webrtc.md) | Huddle: SFU 構成、ルーム状態機械（LINGER 60s）、シグナリングフレーム、参加シーケンス、simulcast/帯域降格、画面共有・共同描画、文字起こし、障害時挙動 |
+| M10 | [canvas-crdt](slack-spec/impl/M10-canvas-crdt.md) | Canvas: 二層 CRDT（ブロック RGA + テキスト）、全 op 定義とマージ規則（LWW/tombstone）、同期プロトコル、スナップショット、権限、コメントのアンカー orphan 化、履歴復元 |
+| M11 | [mobile-clients](slack-spec/impl/M11-mobile-clients.md) | iOS/Android: ライフサイクル別接続戦略、プッシュが同期経路になる設計、APNs/FCM 実装差、ナビゲーション、オフライン outbox、EMM、性能目標 |
 
 ## 設計上の不可侵原則（これを外すと「Slack ではない」）
 
