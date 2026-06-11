@@ -92,11 +92,14 @@ function allocate_ts(team, channel):
   # チャンネルの最新 ts より過去の秒を採番しない（時計巻き戻り対策）
   now = max(now, channel.latest_ts_sec)
   loop:
-    seq = INSERT INTO ts_counters (team,channel,now,1)
-          ON DUPLICATE KEY UPDATE next_seq = LAST_INSERT_ID(next_seq + 1)
-          -> LAST_INSERT_ID()                      # アトミックなインクリメント
-    if seq <= 999999: return (now, seq - 1)        # seq は 0 始まりで返す
-    now += 1                                       # 秒内 100 万件溢れ → 次秒へ
+    INSERT INTO ts_counters (team_id,channel_key,ts_sec,next_seq)
+           VALUES (team, channel, now, 1)
+      ON DUPLICATE KEY UPDATE next_seq = LAST_INSERT_ID(next_seq + 1);
+    # ★その秒の最初の1件（新規行）は LAST_INSERT_ID が未設定になるため ROW_COUNT で分岐する。
+    #   MySQL: INSERT 成功=ROW_COUNT()==1 / 既存更新=ROW_COUNT()==2
+    seq = (ROW_COUNT() == 1) ? 1 : LAST_INSERT_ID();   # その秒で割り当てた 1 始まりの番号
+    if seq <= 1000000: return (now, seq - 1)       # 0 始まりに変換（最大 seq=1000000→999999）
+    now += 1                                       # 秒内 100 万件溢れ → 次秒へ採番し直す
 ```
 
 ### 方式B: チャンネル単位シングルライタ（大規模。Slack 実機に近い）
@@ -149,6 +152,9 @@ function post_message(auth, req):
         reply_users_count = recompute_if_needed()
       WHERE ts = req.thread_ts
     UPDATE channels SET latest_ts = ts WHERE id = channel
+    # mention の materialization（M5 §2.1）。@here は「この瞬間の active メンバー」で確定。
+    recipients = resolve_mentions_at_delivery(msg, channel)   # extract_mentions + presence
+    if recipients: INSERT INTO message_mentions (ts, user_key, reason) VALUES …
   COMMIT
 
   # ---- 4. コミット後の非同期ファンアウト（必ずコミット後）----

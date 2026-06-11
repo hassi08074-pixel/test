@@ -35,14 +35,19 @@ function unread_count_display(user, ch):
   return COUNT(messages m WHERE m.channel = ch
                AND m.ts > last_read(user, ch)
                AND m.state = LIVE
-               AND m.subtype IN countable_subtypes      # M3§5 の表
-               AND m.thread_root IS NULL OR m.subtype = 'thread_broadcast')
+               AND m.subtype IN countable_subtypes      # M3 §5「is_countable」の表
+               AND (m.thread_root IS NULL OR m.subtype = 'thread_broadcast'))
+               # ↑ 括弧必須。AND/OR の優先順位で broadcast を全件取り込まないこと
                # スレッド返信は本流未読に数えない（broadcast を除く）
 
 function mention_count(user, ch):
-  return COUNT(同上範囲 AND mentions_user(m, user))
+  # ★ mentions_user を直接 COUNT 条件にしない（@here が履歴再計算不能なため／下記 §2.1）
+  return COUNT(message_mentions mm
+               JOIN messages m USING (channel, ts)
+               WHERE mm.user = user AND m.channel = ch
+               AND m.ts > last_read(user, ch) AND m.state = LIVE)
 
-function mentions_user(m, user):
+function mentions_user(m, user):                         # ← 配信時に1回だけ評価する関数
   e = extract_mentions(m.text)                          # M2§7
   return user.id ∈ e.users
       OR e.channel OR e.everyone                        # @channel/@everyone は常時
@@ -51,6 +56,25 @@ function mentions_user(m, user):
       OR keyword_hit(m.text_plain, user.keywords)       # 単語境界・大小無視
       OR (m.channel.is_im OR m.channel.is_mpim)         # DM は全件メンション扱い
 ```
+
+### 2.1 mention の materialization（@here を履歴再計算可能にする）
+`mentions_user` は **presence(配信時)** に依存するため、後から SQL で再評価できない。
+そこで投稿/編集の確定時（M1 §3 のコミット内）に、その時点で `mentions_user(m,u)=true`
+となる受信者を展開して保存する:
+```sql
+CREATE TABLE message_mentions (
+  team_id BIGINT UNSIGNED, channel_key BIGINT UNSIGNED,
+  ts_sec INT UNSIGNED, ts_seq MEDIUMINT UNSIGNED,
+  user_key BIGINT UNSIGNED,
+  reason TINYINT,        -- 1=direct 2=here 3=channel/everyone 4=usergroup 5=keyword 6=dm
+  PRIMARY KEY (team_id, channel_key, ts_sec, ts_seq, user_key),
+  KEY idx_user (team_id, user_key, channel_key, ts_sec, ts_seq)
+) ENGINE=InnoDB;
+```
+- `@here` は配信時の active メンバー集合を確定して行を作る（後から active 化しても増えない＝規定どおり）。
+- 編集（M1 §5）で増えた mention は追加 INSERT、減った mention は DELETE（ただし既送通知は取り消さない）。
+- これにより `mention_count` も `client.counts`（M3 §6）も `channel_marked`（M4 §4）も
+  同一の materialized テーブルから決定的に算出され、boot・gap-fill・mark の三経路で値が一致する。
 
 規定:
 - `@here` の active 判定は**メッセージ配信時点**で固定（後から active になっても遡らない）。
@@ -125,10 +149,12 @@ function decide(m, recipient) -> {desktop, mobile, sound, badge, email_candidate
 ## 5. バッジ数の定義（OS アイコンバッジ）
 
 ```
-app_badge(user) = Σ_channels mention_count(user, ch)
-                + Σ_DMs/MPIMs unread_count_display(user, dm)   # DM は全未読
-                + Σ_subscribed_threads thread_unread_mentions
+app_badge(user) = Σ_ch∈channels(¬im∧¬mpim) mention_count(user, ch)   # 通常チャンネルのみ
+                + Σ_dm∈(im∪mpim)           unread_count_display(user, dm)  # DM/MPIM は全未読
+                + Σ_subscribed_threads      thread_unread_mentions
 ```
+- **二重計上の禁止**: im/mpim は第2項のみで数える。第1項の集合から im/mpim を必ず除外する
+  （mention_count は DM 内で全件 mention 扱いのため、両項に入れると 2 倍になる）。
 - 「未読チャンネルがあるだけ」ではバッジは増えない（メンション/DM のみ）。これが Slack の節度の核。
 - サイドバー: 未読あり=チャンネル名太字（白）、メンションあり=赤バッジ+数値。
 - ワークスペース切替レール: メンション合計の赤バッジ、未読のみは白ドット。

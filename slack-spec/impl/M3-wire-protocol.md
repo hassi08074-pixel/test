@@ -140,7 +140,10 @@ on message(ev):
       promote(pending_outbox[ev.client_msg_id], ev.ts); return
   if store.has(ev.channel, ev.ts): return         # at-least-once の dedup（キー= channel+ts）
   insert_sorted(ch.messages, ev)                  # ts 順挿入（通常は末尾 O(1)）
-  if ev.thread_ts: update_parent_reply_meta(ev)
+  if ev.thread_ts and ev.subtype != 'thread_broadcast':
+      update_parent_reply_meta(ev)                # スレッド返信は親メタ更新のみ。
+      bump_thread_unread(ev) if subscribed(ch, ev.thread_ts)  # 本流 unread には触れない
+      return                                      # ★本流カウンタを増やさない（M5 の式と一致）
   if not viewing(ch) or not window_focused():
       ch.unread_count += (is_countable(ev) ? 1 : 0)   # join/leave 等は数えない
       ch.mention_count += (mentions_me(ev) ? 1 : 0)
@@ -159,6 +162,10 @@ on channel_marked(ev):                            # 他端末同期。自端末�
 `null(通常), bot_message, file_share, me_message, thread_broadcast` → 数える。
 `channel_join, channel_leave, channel_topic, channel_purpose, channel_name,
  channel_archive, reminder_add, tombstone` → 数えない。
+> 注: is_countable は **subtype だけ**を見る。スレッド返信（subtype=null だが
+> `thread_ts` あり・非 broadcast）は本流未読に数えないため、`on message` の段で
+> is_countable に到達する前に return 済みであること（上記参照）。これにより
+> クライアント増分が M5 §2 の `unread_count_display`（thread_root を除外）と一致する。
 
 ---
 
