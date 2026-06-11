@@ -40,6 +40,15 @@ DDL・擬似コード・状態機械・EBNF・フィールド単位契約・受�
 | M10 | [canvas-crdt](slack-spec/impl/M10-canvas-crdt.md) | Canvas: 二層 CRDT（ブロック RGA + テキスト）、全 op 定義とマージ規則（LWW/tombstone）、同期プロトコル、スナップショット、権限、コメントのアンカー orphan 化、履歴復元 |
 | M11 | [mobile-clients](slack-spec/impl/M11-mobile-clients.md) | iOS/Android: ライフサイクル別接続戦略、プッシュが同期経路になる設計、APNs/FCM 実装差、ナビゲーション、オフライン outbox、EMM、性能目標 |
 
+## 魔改造設計 (`slack-spec/X*`)
+
+このチャットを ax base（会社の中心となる RAG/コンテキスト基盤）の一面へ作り替え、
+有料 AI「デキスギクン」と並行コーディングセッションへ双方向結合する戦略＋実装差分設計。
+
+| # | ファイル | 内容 |
+|---|---|---|
+| X1 | [axbase-ai-native-fusion](slack-spec/X1-axbase-ai-native-fusion.md) | トポロジ（ax base 中心・3面結合）、ナレッジ採取パイプライン（M1 ファンアウト拡張）、新データモデル（atom/provenance/embedding/KG/decision/QA）、ax base 取り込み・検索契約、**ACL 忠実リトリーバル（最重要）**、鮮度・失効、デキスギクンのチャット内サーフェス、MCP 双方向ブリッジ、クロスセル機構、ガバナンス、フェーズドロールアウト、既存仕様の差分マップ |
+
 ## 設計上の不可侵原則（これを外すと「Slack ではない」）
 
 1. **チャンネル中心** — 会話の第一級単位は「人」ではなく「チャンネル（トピック）」。
