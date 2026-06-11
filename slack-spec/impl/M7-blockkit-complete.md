@@ -49,7 +49,7 @@
 | field | 必須 | 上限 |
 |---|---|---|
 | text (plain_text / overflow・select は mrkdwn 不可、radio/checkbox は mrkdwn 可) | ✔ | 75 |
-| value | ✔ | 150 |
+| value | ✔ | **75**（Slack 実 API の上限。以前の本書 150 は誤り） |
 | description (plain_text) | – | 75 |
 | url (overflow のみ) | – | 3000 |
 
@@ -69,7 +69,7 @@
 | text | text/fields どちらか✔ | ≤3000 |
 | fields | 〃 | 配列 ≤10、各 text ≤2000。2列グリッド描画 |
 | accessory | – | element 1個（右側に配置） |
-| expand | – | bool。true で「Show more」折りたたみを無効化 |
+| expand | – | bool。true で長文の自動「Show more」折りたたみを無効化（※Slack 実 API には無い本クローンの拡張。互換厳守なら削除） |
 
 accessory に置ける element: button, 全 select/multi_select, overflow, datepicker,
 timepicker, image, checkboxes, radio_buttons, workflow_button。

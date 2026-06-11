@@ -90,6 +90,11 @@ type_boost(d)= 1.2 if d.is_thread_parent else 1.0
 タイブレーク: ts 降順。
 ```
 
+- **自由語ゼロ（修飾子のみ）のクエリ**（例 `in:#general has:pdf`）は BM25 項に
+  検索語が無く全件 0 → 乗算スコアが全件同点に縮退する。この場合は **自動的に
+  `sort=timestamp` 相当（recency×affinity の降順）にフォールバック**し、
+  「フィルタ結果を新しい順」で返す（score ソートのままタイブレーク ts に落とすのと
+  等価だが、affinity を効かせるため recency×affinity を実効スコアにする）。
 - `sort=timestamp` は score を無視し ts 順（フィルタのみ適用）。
 - ハイライト: 一致トークン区間を ``〜``（私用領域）で囲んで返し、
   クライアントが `<mark>` 相当（黄背景 #FFF2B8）に変換。

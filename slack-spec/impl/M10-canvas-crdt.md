@@ -30,29 +30,47 @@ Canvas
 
 すべての編集は以下の op に正規化される。op は不変ログとして保存（イベントソーシング）:
 
+> **不変条件 CR-0**: すべての op は `(lamport, replica)` を持つ。RGA の挿入順と
+> 全 LWW タイブレークはこの対で決定する。これが無い op は収束しない。
+
 ```jsonc
-// ブロック層
-{ "op":"block_insert", "id":BlockId, "after":BlockId|HEAD, "type":"paragraph", "ts":Lamport }
-{ "op":"block_delete", "id":BlockId }                      // tombstone 化
-{ "op":"block_move",   "id":BlockId, "after":BlockId|HEAD }
+// ブロック層（全 op に lamport,replica 必須）
+{ "op":"block_insert", "id":BlockId, "after":BlockId|HEAD, "type":"paragraph",
+  "lamport":n, "replica":r }                               // 挿入順 RGA のキーは id=(replica,counter)
+{ "op":"block_delete", "id":BlockId, "lamport":n, "replica":r }   // delete-vs-move の順序判定に必要
+{ "op":"block_move",   "id":BlockId, "after":BlockId|HEAD,
+  "lamport":n, "replica":r }                               // ★LWW のため必須（旧版は欠落）
 { "op":"block_set",    "id":BlockId, "key":"type|indent|checked|…", "value":… ,
   "lamport":n, "replica":r }                               // LWW (lamport,replica) 比較
 // テキスト層（ブロック内）
-{ "op":"text_insert",  "block":BlockId, "id":CharId, "after":CharId|HEAD, "ch":"あ" }
-{ "op":"text_delete",  "block":BlockId, "id":CharId }
+{ "op":"text_insert",  "block":BlockId, "id":CharId, "after":CharId|HEAD, "ch":"あ",
+  "lamport":n, "replica":r }                               // CharId=(replica,counter)
+{ "op":"text_delete",  "block":BlockId, "id":CharId, "lamport":n, "replica":r }
 { "op":"text_format",  "block":BlockId, "range":[CharId,CharId], "style":"bold", "value":true,
-  "lamport":n }                                            // 範囲は anchor の CharId 対
+  "lamport":n, "replica":r }                               // ★replica 必須（旧版は欠落）。範囲は anchor の CharId 対
 ```
 
 ### マージ規則（決定的であること）
 1. **挿入順序 (RGA)**: 同じ `after` に複数 replica が挿入 →
    `(lamport, replica_id)` の降順で直後に並べる。全 replica で同一結果。
-2. **delete vs edit**: tombstone 勝ち。tombstone への text_insert は適用するが非表示
-   （undo で復活した場合に内容が戻る）。
-3. **set の競合**: LWW。`(lamport, replica_id)` 大きい方が勝つ。
-4. **move の競合**: move も LWW（同一ブロックへの並行 move は片方が勝つ）。
+2. **char-level delete vs insert**: tombstone 勝ち。**tombstone を anchor に持つ
+   `text_insert` は可視**（消えた文字の直後にタイプした文字は見える）。anchor が
+   tombstone でも新規 char 自体は tombstone ではない。
+3. **block-level delete**: 削除ブロック配下の既存 op は破棄せず hidden 保持し、
+   ブロックの undelete（block_set で復活）時に内容ごと戻す。← 旧規則2が char と
+   block を混同していたため分離。
+4. **set の競合**: 同一 `(id,key)` への並行 set は LWW。`(lamport, replica)` 大きい方が勝つ。
+5. **text_format の競合**: **文字×style 単位の LWW**。重なり範囲の各 CharId について、
+   同一 style への並行 format は `(lamport, replica)` 大きい方の `value` を採用
+   （bold=true と bold=false が衝突しても決定的に1つに収束）。
+6. **move の競合**: 同一ブロックへの並行 move は `(lamport, replica)` の LWW。
    move は「delete+insert」ではなく専用 op（重複出現を防ぐ）。
-5. **checked の競合**: LWW（最後の操作者が勝ち。カウンタではない）。
+   **⚠ 既知の難所（CR-1）**: 相互参照する move（A を B の後ろへ／同時に B を A の後ろへ）は
+   単純な "after"+LWW ではサイクルを生み線形順序が壊れ得る。本実装は
+   **Kleppmann の move-tree 方式**（各 move に親子関係＋並行 move の祖先循環検出で
+   後着 move を無効化）を採用し、または server-assigned fractional index を
+   move のたびに LWW 更新する方式に退避する。pure list-RGA だけでは不十分。
+7. **checked の競合**: LWW（最後の操作者が勝ち。トグルのカウンタ加算ではない）。
 
 ---
 

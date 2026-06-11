@@ -15,6 +15,8 @@
 | Minor（曖昧さ・二重計上リスク） | 1 | **修正済** (E) |
 | 整合確認 OK（合格項目） | 7 領域 | 後述 |
 
+> 第2パス（M7/M8/M9/M10 精査）の結果は本書末尾「第2パス精査」に追記（Major 1・Minor 3・難所 1）。
+
 修正は本検証で該当ファイルに直接適用済み。以下は内容と根拠。
 
 ---
@@ -108,13 +110,66 @@
 
 ---
 
-## 検証の結論
+## 第2パス精査（M7 Block Kit / M8 ランキング / M9 / M10 CRDT）
 
-- **Critical 3件はいずれも「そのまま実装するとデータ不整合（未読・ts）を生む」実害級**で、
-  仕様レビューの主目的を果たした。すべて修正適用済み。
-- Major 1件（@here）はアーキテクチャの欠落で、materialization 追加により boot/gap-fill/mark の
-  三経路整合を回復。
-- 横断する固定値（3秒・30分・40000・3段アップロード等）は全ファイルで一貫しており、
-  仕様群の内部参照規律は概ね健全。
-- 次の検証対象候補: M7 のブロック上限値を Slack 実 API のエラーメッセージ文言と突合、
-  M8 ランキング係数の単調性、M9/M10 の障害シナリオの網羅性。
+| 重大度 | 件数 | 状態 |
+|---|---|---|
+| Major | 1 (G) | 修正済 |
+| Minor | 3 (F,H,+clarity) | 修正済 |
+| 既知の難所として明示 | 1 (CR-1) | 注記追加 |
+
+### F. [Minor/修正済] M7 `option.value` の上限が実 API と不一致
+- M7 §1.3 が `value` 上限を 150 と記載。Slack 実 API は **75**。バリデータが本物より
+  緩く、本家が弾く payload を通してしまう。→ 75 に訂正。
+- 併せて section の `expand` フィールドが実 API に存在しない可能性が高いため
+  「本クローンの拡張」と明示（互換厳守なら削除する判断を委ねる）。
+- なお header=150 / section text=3000 / button text=75・value=2000・url=3000 /
+  confirm 100/300/30/30 / actions 25 / context 10 / checkboxes・radio 10 /
+  overflow 2–5 / placeholder 150 は実 API と一致を確認（合格）。
+
+### G. [Major/修正済] M10 の op が LWW タイブレークキーを欠く（CRDT 非収束）
+- マージ規則 3〜6 は `(lamport, replica)` の LWW を前提にするが、`block_move` と
+  `text_format` の op 定義に **lamport/replica が無かった**。equal-lamport の並行
+  move / 並行 format で勝者が非決定 → レプリカ間で表示が分岐し得る。
+- 修正: 不変条件 **CR-0「全 op は (lamport, replica) を持つ」** を新設し、
+  block_insert/delete/move・text_insert/delete/format すべてにキーを付与。
+  text_format の競合解決規則（文字×style 単位 LWW）を新規追記。
+
+### Clarity. [Minor/修正済] M10 規則2 が char 削除と block 削除を混同
+- 「tombstone への text_insert は非表示」は char レベルでは誤り（削除直後にタイプした
+  文字は**見えなければならない**）。char-level（規則2: insert は可視）と block-level
+  （規則3: 配下を hidden 保持し undelete で復活）に分離。
+
+### H. [Minor/修正済] M8 修飾子のみクエリでスコアが全件同点に縮退
+- 乗算スコアは BM25 を含むため、自由語ゼロのクエリ（`in:#x has:pdf` 等）で全件 0 点 →
+  実質ランダム（ts タイブレークのみ）。→ 自由語ゼロ時は recency×affinity を実効スコアに
+  する timestamp フォールバックを明文化。
+
+### CR-1. [既知の難所/注記] M10 の相互参照 move はサイクルを生む
+- list-RGA に "after"+LWW で move を載せると、相互 move でサイクル化し線形順序が壊れる
+  典型問題。Kleppmann の move-tree（並行 move の祖先循環検出で後着を無効化）採用を
+  規則6に明記。「pure list-RGA では不十分」と警告。
+
+### 第2パスで合格（OK）
+- M7 のブロック/要素上限値は `option.value` を除き実 API と一致。
+- M8 recency は単調減少・下限 0.05（約130日で床）、affinity 各加点は意図的スタック、
+  engagement は cap 付き単調 — 単調性に破綻なし。
+- M9 Huddle: ルーム状態機械（LINGER 60s）・参加シーケンス・障害遷移に論理矛盾なし
+  （`addTransceiver video sendonly×2` は simulcast 層数の表記ゆれのみ＝無害）。
+
+---
+
+## 検証の結論（2パス合計）
+
+総計: **Critical 3 / Major 2 / Minor 4 / 既知の難所 1**。修正必須 9 件すべて適用済み、
+難所 1 件は方式を明記。
+
+- **第1パス（コア整合）**: Critical 3件は「そのまま実装するとデータ不整合（未読・ts）を
+  生む」実害級。@here の Major は materialization 追加で boot/gap-fill/mark の三経路整合を回復。
+- **第2パス（Block Kit・ランキング・CRDT）**: M10 の CRDT が **LWW キー欠落で非収束**だった
+  のが最大の発見（Major G）。Block Kit は `option.value` の1値を除き実 API と一致。
+  M8 のランキングは単調性に破綻なし、修飾子のみクエリの縮退のみ補正。
+- 横断する固定値（3秒・30分・40000・3段アップロード・各種ブロック上限）は全ファイルで一貫し、
+  仕様群の内部参照規律は健全と判断する。
+- 未検証で残る領域: M11 モバイルのプッシュ取り消しレースの網羅、M9 の再ネゴシエーション
+  シーケンスの SDP 詳細、各 Gherkin の機械実行（実コード化での裏取り）。
