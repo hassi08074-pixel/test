@@ -21,6 +21,20 @@ Slack を「細部まで同一の製品」として再実装できるよう、�
 | 11 | [clients-ui-ux](slack-spec/11-clients-ui-ux.md) | レイアウト/テーマ/ショートカット/オンボーディング/i18n |
 | 12 | [apis](slack-spec/12-apis.md) | Web API/Events API/Socket Mode/レート制限/署名検証 |
 
+## 実装グレード仕様 (`slack-spec/impl/`)
+
+上の 00–12 が「何があるか（機能仕様）」、こちらは「どう作るか（実装仕様）」。
+DDL・擬似コード・状態機械・EBNF・フィールド単位契約・受け入れ基準 (Gherkin) で記述。
+
+| # | ファイル | 内容 |
+|---|---|---|
+| M1 | [message-engine](slack-spec/impl/M1-message-engine.md) | 書き込みパス完全定義: SQL DDL、ts 採番アルゴリズム（2方式）、投稿トランザクション、冪等性、編集/削除の状態遷移、unfurl 後付け、スレッドのエッジケース、障害時挙動 |
+| M2 | [mrkdwn-grammar](slack-spec/impl/M2-mrkdwn-grammar.md) | mrkdwn の EBNF、エスケープ規則、エンティティ文法、書式境界規則、オートリンク、絵文字解決アルゴリズム、rich_text 完全スキーマ、レンダリング規定、テストベクタ |
+| M3 | [wire-protocol](slack-spec/impl/M3-wire-protocol.md) | boot 応答スキーマ、WS フレーム単位契約、接続状態機械、gap-fill 手順、楽観送信 outbox、typing/presence の数値規定、イベント適用アルゴリズム |
+| M4 | [api-contracts](slack-spec/impl/M4-api-contracts.md) | コア API のフィールド単位契約: 全引数・バリデーション順序・全エラーコード・応答スキーマ、レート制限実装、Events API 配信契約 |
+| M5 | [unread-notification-algorithms](slack-spec/impl/M5-unread-notification-algorithms.md) | 未読/メンション数の計算式、通知判定の決定的関数（decide）、配信ルーティング、プッシュペイロード、バッジ定義、DND 判定、受け入れ基準 |
+| M6 | [ui-metrics](slack-spec/impl/M6-ui-metrics.md) | デザイントークン（色/タイポ）、レイアウト寸法、メッセージ行構造、集約規則、ホバーバー、コンポーザ、スクロール挙動、アニメーション、a11y |
+
 ## 設計上の不可侵原則（これを外すと「Slack ではない」）
 
 1. **チャンネル中心** — 会話の第一級単位は「人」ではなく「チャンネル（トピック）」。
