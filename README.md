@@ -48,6 +48,8 @@ DDL・擬似コード・状態機械・EBNF・フィールド単位契約・受�
 | # | ファイル | 内容 |
 |---|---|---|
 | X1 | [axbase-ai-native-fusion](slack-spec/X1-axbase-ai-native-fusion.md) | トポロジ（ax base 中心・3面結合）、ナレッジ採取パイプライン（M1 ファンアウト拡張）、新データモデル（atom/provenance/embedding/KG/decision/QA）、ax base 取り込み・検索契約、**ACL 忠実リトリーバル（最重要）**、鮮度・失効、デキスギクンのチャット内サーフェス、MCP 双方向ブリッジ、クロスセル機構、ガバナンス、フェーズドロールアウト、既存仕様の差分マップ |
+| X2 | [acl-security-threat-model](slack-spec/X2-acl-security-threat-model.md) | AIリトリーバルの脅威モデル（信頼境界/資産）、SEC不変条件、攻撃クラスA1–A12（直接越権/プロンプトインジェクション直接・間接/出典捏造/推論側路/kickレース/クロステナント/埋め込みインバージョン/confused deputy/ポイズニング/エージェント越権）と各防御、プロンプト・出力ガード設計、攻撃網羅Gherkin、監視/レッドチーム運用 |
+| X3 | [harvest-enrichment-pipeline](slack-spec/X3-harvest-enrichment-pipeline.md) | 採取パイプラインのモデル選定（Haiku4.5ゲート→Sonnet4.6抽出→Opus4.8合成のカスケード）、正確な料金/Batches50%/プロンプトキャッシュ/最小キャッシュ長、構造化出力スキーマ（各段）、キャッシュ前置＋インジェクション安全なプロンプト、規模別コスト試算（~$1.4/ユーザー月）、スループット/信頼性/予算/再ハーベスト、受け入れ基準 |
 
 ## 設計上の不可侵原則（これを外すと「Slack ではない」）
 
